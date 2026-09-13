@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Six-Chord Hearing Exercise</title>
+<script src="https://www.verovio.org/javascript/latest/verovio-toolkit-wasm.js" defer></script>
+<style>
+body{margin:0;background:#f4f3ef;color:#222;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app{width:min(760px,94vw);margin:32px auto}
+.card{background:#fff;border-radius:18px;padding:26px;box-shadow:0 5px 20px #0001;text-align:center}
+h1{text-align:center;margin:0 0 6px}.sub{text-align:center;color:#666;margin:0 0 22px}
+.info{display:none;grid-template-columns:1fr 1fr;gap:12px}.box{background:#f6f6f6;border-radius:12px;padding:13px}
+.label{font-size:.75rem;color:#777;text-transform:uppercase;letter-spacing:.08em}.value{font-size:1.35rem;font-weight:700;margin-top:3px}
+.start{margin:14px 0;color:#444}.notation-frame{width:100%;overflow:hidden;margin:0 auto 8px;min-height:1px}.notation-frame svg{display:block;width:100%;height:auto}
+#status{min-height:22px;color:#777;font-size:.9rem;margin:8px}
+.solution{margin-top:18px;border-top:1px solid #ddd;padding-top:18px}.solution-info{font-size:1.1rem;font-weight:700;margin-bottom:10px}.notation{overflow:hidden}.notation svg{display:block;width:100%;height:auto}
+.harmony-wrap{width:96%;margin:0 auto}.harmony{display:grid;grid-template-columns:repeat(6,1fr);font:25px "Times New Roman",serif;text-align:center;gap:0}.harmony-cell{display:flex;flex-direction:column;align-items:center;justify-content:flex-start}.harmony-function{font-size:.62em;margin-top:5px;color:#666;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-weight:650;letter-spacing:.03em}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:20px}
+button{font:inherit;font-weight:650;border:2px solid #d5d5d5;background:#fff;border-radius:12px;padding:13px;cursor:pointer}
+button.primary{background:#222;color:#fff;border-color:#222}
+@media(max-width:600px){.info,.actions{grid-template-columns:1fr}.harmony-wrap{width:100%}.harmony{font-size:20px}.harmony-function{font-size:.65em}}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>Six-Chord Hearing Exercise</h1>
+<p class="sub">Identify the six-chord outer-voice progression.</p>
+<div class="card">
+<div class="info">
+<div class="box"><div class="label">Key</div><div class="value" id="key"></div></div>
+<div class="box"><div class="label">Mode</div><div class="value" id="mode"></div></div>
+</div>
+
+<div class="start">Starting Pitches</div>
+<div class="notation-frame" id="notationFrame"></div>
+<div id="status">Loading notation engine…</div>
+
+<div class="actions">
+<button onclick="listen()">▶ Listen</button>
+<button onclick="reveal()">Reveal Solution</button>
+<button class="primary" onclick="generate()">Generate</button>
+</div>
+
+<div class="solution" id="solution" hidden>
+<div class="solution-info" id="solutionInfo"><span id="solutionKey"></span> · <span id="solutionMode"></span></div>
+<div class="harmony-wrap"><div class="harmony" id="harmony"></div></div>
+</div>
+</div>
+</div>
+
+<script>
+const EXERCISES=[{"id":"01","mode":"major","bass":["C3","D3","E3","F3","G3","C3"],"soprano":["E5","D5","C5","C5","B4","C5"],"chords":["I","viio6","I6","IV","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/01.mp3"},{"id":"02","mode":"major","bass":["C3","D3","E3","F3","G3","C3"],"soprano":["E5","D5","C5","D5","D5","C5"],"chords":["I","viio6","I6","ii6","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/02.mp3"},{"id":"03","mode":"major","bass":["C3","D3","E3","F3","G3","A3"],"soprano":["E5","D5","C5","D5","D5","C5"],"chords":["I","viio6","I6","ii6","V7","vi"],"functions":["T","T","T","P","D","T"],"audio":"major/03.mp3"},{"id":"04","mode":"major","bass":["C3","D3","E3","F3","G3","G2"],"soprano":["G4","F4","G4","F4","E4","D4"],"chords":["I","viio6","I6","IV","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/04.mp3"},{"id":"05","mode":"major","bass":["C3","D3","E3","F3","G3","G2"],"soprano":["G4","F4","G4","F4","E4","D4"],"chords":["I","viio6","I6","ii6","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/05.mp3"},{"id":"06","mode":"major","bass":["C3","D3","E3","F3","G3","G2"],"soprano":["G4","G4","G4","F4","F4","G4"],"chords":["I","V43","I6","IV","ii","V"],"functions":["T","T","T","P","P","D"],"audio":"major/06.mp3"},{"id":"07","mode":"major","bass":["C3","B2","C3","F3","G3","C3"],"soprano":["C5","D5","C5","C5","B5","C5"],"chords":["I","V65","I","IV","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/07.mp3"},{"id":"08","mode":"major","bass":["C3","B2","C3","F3","G3","C3"],"soprano":["C5","D5","C5","D5","D5","C5"],"chords":["I","V65","I","ii6","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/08.mp3"},{"id":"09","mode":"major","bass":["C3","B2","C3","F2","G2","G2"],"soprano":["E4","F4","E4","F4","E4","D4"],"chords":["I","V65","I","IV","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/09.mp3"},{"id":"10","mode":"major","bass":["C3","B2","C3","F2","G2","G2"],"soprano":["E4","F4","E4","F4","E4","D4"],"chords":["I","V65","I","ii6","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/10.mp3"},{"id":"11","mode":"major","bass":["C3","B2","C3","F2","F2","G2"],"soprano":["G4","G4","G4","A4","A4","G4"],"chords":["I","V65","I","IV","ii6","V"],"functions":["T","T","T","P","P","D"],"audio":"major/11.mp3"},{"id":"12","mode":"major","bass":["C3","C3","C3","F3","G3","C3"],"soprano":["E4","F4","E4","F4","F4","E4"],"chords":["I","IV64","I","IV","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/12.mp3"},{"id":"13","mode":"major","bass":["C3","C3","C3","F3","G3","C3"],"soprano":["E4","F4","E4","F4","F4","E4"],"chords":["I","IV64","I","ii6","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/13.mp3"},{"id":"14","mode":"major","bass":["C3","C3","C3","F3","G3","G3"],"soprano":["E4","F4","E4","F4","E4","D4"],"chords":["I","IV64","I","IV","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/14.mp3"},{"id":"15","mode":"major","bass":["C3","C3","C3","F3","G3","G3"],"soprano":["E4","F4","E4","F4","E4","D4"],"chords":["I","IV64","I","ii6","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/15.mp3"},{"id":"16","mode":"major","bass":["C3","C3","C3","F3","D3","G3"],"soprano":["E4","F4","E4","F4","F4","G4"],"chords":["I","IV64","I","IV","ii","V"],"functions":["T","T","T","P","P","D"],"audio":"major/16.mp3"},{"id":"17","mode":"major","bass":["C3","F3","E3","F3","G3","C3"],"soprano":["E4","F4","G4","F4","F4","E4"],"chords":["I","IV","I6","IV","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/17.mp3"},{"id":"18","mode":"major","bass":["C3","F3","E3","F3","G3","C3"],"soprano":["E4","F4","G4","F4","F4","E4"],"chords":["I","IV","I6","ii6","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/18.mp3"},{"id":"19","mode":"major","bass":["C3","F3","E3","F3","G3","G3"],"soprano":["E4","F4","G4","F4","E4","D4"],"chords":["I","IV","I6","IV","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/19.mp3"},{"id":"20","mode":"major","bass":["C3","F3","E3","F3","G3","G3"],"soprano":["E4","F4","G4","F4","E4","D4"],"chords":["I","IV","I6","ii6","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/20.mp3"},{"id":"21","mode":"major","bass":["C3","F3","E3","F3","D3","G3"],"soprano":["E5","D5","C5","C5","D5","D5"],"chords":["I","V42","I6","IV","ii","V"],"functions":["T","T","T","P","P","D"],"audio":"major/21.mp3"},{"id":"22","mode":"major","bass":["C4","A3","E3","F3","G3","C3"],"soprano":["G4","A4","G4","F4","F4","E4"],"chords":["I","vi","I6","IV","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/22.mp3"},{"id":"23","mode":"major","bass":["C4","A3","E3","F3","G3","C3"],"soprano":["G4","A4","G4","F4","F4","E4"],"chords":["I","vi","I6","ii6","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/23.mp3"},{"id":"24","mode":"major","bass":["C4","A3","E3","F3","G3","G3"],"soprano":["G4","A4","G4","F4","E4","D4"],"chords":["I","vi","I6","IV","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/24.mp3"},{"id":"25","mode":"major","bass":["C4","A3","E3","F3","G3","G3"],"soprano":["G4","A4","G4","F4","E4","D4"],"chords":["I","vi","I6","ii6","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/25.mp3"},{"id":"26","mode":"major","bass":["C4","A3","E3","F3","D3","G3"],"soprano":["G4","A4","G4","F4","F4","G4"],"chords":["I","vi","I6","IV","ii","V"],"functions":["T","T","T","P","P","D"],"audio":"major/26.mp3"},{"id":"27","mode":"major","bass":["C3","B2","A2","F2","G2","C3"],"soprano":["C5","D5","C5","C5","B4","C5"],"chords":["I","V6","vi","IV","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/27.mp3"},{"id":"28","mode":"major","bass":["C3","B2","A2","F2","G2","C3"],"soprano":["C5","D5","C5","D5","D5","C5"],"chords":["I","V6","vi","ii6","V7","I"],"functions":["T","T","T","P","D","T"],"audio":"major/28.mp3"},{"id":"29","mode":"major","bass":["C3","B2","A2","F2","G2","G2"],"soprano":["E5","D5","E5","F5","E5","D5"],"chords":["I","V6","vi","IV","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/29.mp3"},{"id":"30","mode":"major","bass":["C3","B2","A2","F2","G2","G2"],"soprano":["E5","D5","E5","F5","E5","D5"],"chords":["I","V6","vi","ii6","I64","V"],"functions":["T","T","T","P","D","D"],"audio":"major/30.mp3"},{"id":"31","mode":"major","bass":["C4","B3","A3","F3","D3","G3"],"soprano":["C5","D5","C5","C5","D5","D5"],"chords":["I","V6","vi","IV","ii","V"],"functions":["T","T","T","P","P","D"],"audio":"major/31.mp3"},{"id":"32","mode":"major","bass":["C3","E3","F3","G3","G3","C3"],"soprano":["G5","G5","F5","E5","D5","C5"],"chords":["I","I6","IV","I64","V7","I"],"functions":["T","T","P","D","D","T"],"audio":"major/32.mp3"},{"id":"33","mode":"major","bass":["C3","E3","F3","G3","G3","C3"],"soprano":["E5","E5","D5","C5","B4","C5"],"chords":["I","I6","ii6","I64","V7","I"],"functions":["T","T","P","D","D","T"],"audio":"major/33.mp3"},{"id":"34","mode":"major","bass":["C3","E3","F3","G3","G3","A3"],"soprano":["G5","G5","F5","E5","D5","C5"],"chords":["I","I6","IV","I64","V7","vi"],"functions":["T","T","P","D","D","T"],"audio":"major/34.mp3"},{"id":"35","mode":"major","bass":["C3","E3","F3","G3","G3","A3"],"soprano":["E5","E5","D5","C5","B4","C5"],"chords":["I","I6","ii6","I64","V7","vi"],"functions":["T","T","P","D","D","T"],"audio":"major/35.mp3"},{"id":"36","mode":"major","bass":["C3","F3","F3","G3","G3","C3"],"soprano":["C5","C5","D5","C5","B4","C5"],"chords":["I","IV","ii6","I64","V7","I"],"functions":["T","P","P","D","D","T"],"audio":"major/36.mp3"},{"id":"37","mode":"major","bass":["C4","A3","F3","G3","G3","C3"],"soprano":["E5","E5","F5","E5","D5","E5"],"chords":["I","vi","IV","I64","V","I"],"functions":["T","T","P","D","D","T"],"audio":"major/37.mp3"},{"id":"38","mode":"major","bass":["C4","A3","F3","G3","G3","C3"],"soprano":["E5","E5","F5","E5","D5","E5"],"chords":["I","vi","ii6","I64","V","I"],"functions":["T","T","P","D","D","T"],"audio":"major/38.mp3"},{"id":"39","mode":"major","bass":["C4","A3","F3","G3","G3","A3"],"soprano":["E5","E5","F5","E5","D5","C5"],"chords":["I","vi","IV","I64","V7","vi"],"functions":["T","T","P","D","D","T"],"audio":"major/39.mp3"},{"id":"40","mode":"major","bass":["C4","A3","F3","G3","G3","A3"],"soprano":["E5","E5","F5","E5","D5","C5"],"chords":["I","vi","ii6","I64","V7","vi"],"functions":["T","T","P","D","D","T"],"audio":"major/40.mp3"},{"id":"41","mode":"minor","bass":["C3","D3","E-flat3","F3","G3","C3"],"soprano":["E-flat5","D5","C5","C5","B-natural4","C5"],"chords":["i","viio6","i6","iv","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/41.mp3"},{"id":"42","mode":"minor","bass":["C3","D3","E-flat3","F3","G3","C3"],"soprano":["E-flat5","D5","C5","D5","B-natural4","C5"],"chords":["i","viio6","i6","iio6","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/42.mp3"},{"id":"43","mode":"minor","bass":["C3","D3","E-flat3","F3","G3","G2"],"soprano":["G4","F4","G4","F4","E-flat4","D4"],"chords":["i","viio6","i6","iv","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/43.mp3"},{"id":"44","mode":"minor","bass":["C3","D3","E-flat3","F3","G3","G2"],"soprano":["G4","F4","G4","F4","E-flat4","D4"],"chords":["i","viio6","i6","iio6","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/44.mp3"},{"id":"45","mode":"minor","bass":["C3","D3","E-flat3","F3","F3","G3"],"soprano":["C5","B-natural4","C5","A-flat4","A-flat4","G4"],"chords":["i","V43","i6","iv","iio6","V"],"functions":["T","T","T","P","P","D"],"audio":"minor/45.mp3"},{"id":"46","mode":"minor","bass":["C3","B2","C3","F3","G3","C3"],"soprano":["C5","D5","C5","C5","B-natural4","C5"],"chords":["i","V65","i","iv","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/46.mp3"},{"id":"47","mode":"minor","bass":["C3","B2","C3","F3","G3","C3"],"soprano":["C5","D5","C5","D5","B-natural4","C5"],"chords":["i","V65","i","iio6","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/47.mp3"},{"id":"48","mode":"minor","bass":["C3","B2","C3","F2","G2","G2"],"soprano":["E-flat4","F4","E-flat4","F4","E-flat4","D4"],"chords":["i","V65","i","iv","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/48.mp3"},{"id":"49","mode":"minor","bass":["C3","B2","C3","F2","G2","G2"],"soprano":["E-flat4","F4","E-flat4","F4","E-flat4","D4"],"chords":["i","V65","i","iio6","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/49.mp3"},{"id":"50","mode":"minor","bass":["C3","B2","C3","F2","F2","G2"],"soprano":["G4","G4","G4","A-flat4","A-flat4","G4"],"chords":["i","V65","i","iv","iio6","V"],"functions":["T","T","T","P","P","D"],"audio":"minor/50.mp3"},{"id":"51","mode":"minor","bass":["C3","C3","C3","F3","G3","C3"],"soprano":["E-flat4","F4","E-flat4","F4","D4","E-flat4"],"chords":["i","iv64","i","iv","V","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/51.mp3"},{"id":"52","mode":"minor","bass":["C3","C3","C3","F3","G3","C3"],"soprano":["E-flat4","F4","E-flat4","F4","D4","E-flat4"],"chords":["i","iv64","i","iio6","V","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/52.mp3"},{"id":"53","mode":"minor","bass":["C3","C3","C3","F3","G3","G3"],"soprano":["E-flat4","F4","E-flat4","F4","E-flat4","D4"],"chords":["i","iv64","i","iv","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/53.mp3"},{"id":"54","mode":"minor","bass":["C3","C3","C3","F3","G3","G3"],"soprano":["E-flat4","F4","E-flat4","F4","E-flat4","D4"],"chords":["i","iv64","i","iio6","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/54.mp3"},{"id":"55","mode":"minor","bass":["C3","C3","C3","F3","F3","G3"],"soprano":["G4","A-flat4","G4","A-flat4","A-flat4","G4"],"chords":["i","iv64","i","iv","iio6","V"],"functions":["T","T","T","P","P","D"],"audio":"minor/55.mp3"},{"id":"56","mode":"minor","bass":["C3","F3","E-flat3","F3","G3","C3"],"soprano":["E-flat4","F4","G4","F4","F4","E-flat4"],"chords":["i","iv","i6","iv","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/56.mp3"},{"id":"57","mode":"minor","bass":["C3","F3","E-flat3","F3","G3","C3"],"soprano":["E-flat4","F4","G4","F4","F4","E-flat4"],"chords":["i","iv","i6","iio6","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/57.mp3"},{"id":"58","mode":"minor","bass":["C3","F3","E-flat3","F3","G3","G3"],"soprano":["E-flat4","F4","G4","F4","E-flat4","D4"],"chords":["i","iv","i6","iv","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/58.mp3"},{"id":"59","mode":"minor","bass":["C3","F3","E-flat3","F3","G3","G3"],"soprano":["E-flat4","F4","G4","F4","E-flat4","D4"],"chords":["i","iv","i6","iio6","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/59.mp3"},{"id":"60","mode":"minor","bass":["C3","F3","E-flat3","F3","F3","G3"],"soprano":["E-flat5","D5","C5","C5","D5","B-natural4"],"chords":["i","V42","i6","iv","iio6","V"],"functions":["T","T","T","P","P","D"],"audio":"minor/60.mp3"},{"id":"61","mode":"minor","bass":["C4","A-flat3","E-flat3","F3","G3","C3"],"soprano":["G4","A-flat4","G4","F4","F4","E-flat4"],"chords":["i","VI","i6","iv","V7","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/61.mp3"},{"id":"62","mode":"minor","bass":["C4","A-flat3","E-flat3","F3","G3","C3"],"soprano":["G4","A-flat4","G4","F4","D4","E-flat4"],"chords":["i","VI","i6","iio6","V","i"],"functions":["T","T","T","P","D","T"],"audio":"minor/62.mp3"},{"id":"63","mode":"minor","bass":["C4","A-flat3","E-flat3","F3","G3","G3"],"soprano":["G4","A-flat4","G4","F4","E-flat4","D4"],"chords":["i","VI","i6","iv","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/63.mp3"},{"id":"64","mode":"minor","bass":["C4","A-flat3","E-flat3","F3","G3","G3"],"soprano":["G4","A-flat4","G4","F4","E-flat4","D4"],"chords":["i","VI","i6","iio6","i64","V"],"functions":["T","T","T","P","D","D"],"audio":"minor/64.mp3"},{"id":"65","mode":"minor","bass":["C4","A-flat3","E-flat3","F3","F3","G3"],"soprano":["G4","A-flat4","G4","F4","F4","D4"],"chords":["i","VI","i6","iv","iio6","V"],"functions":["T","T","T","P","P","D"],"audio":"minor/65.mp3"},{"id":"66","mode":"minor","bass":["C3","E-flat3","F3","G3","G3","C3"],"soprano":["G5","G5","F5","E-flat5","D5","C5"],"chords":["i","i6","iv","i64","V7","i"],"functions":["T","T","P","D","D","T"],"audio":"minor/66.mp3"},{"id":"67","mode":"minor","bass":["C3","E-flat3","F3","G3","G3","C3"],"soprano":["E-flat5","E-flat5","D5","C5","B-natural4","C5"],"chords":["i","i6","iio6","i64","V7","i"],"functions":["T","T","P","D","D","T"],"audio":"minor/67.mp3"},{"id":"68","mode":"minor","bass":["C3","E-flat3","F3","G3","G3","A-flat3"],"soprano":["G5","G5","F5","E-flat5","D5","C5"],"chords":["i","i6","iv","i64","V7","VI"],"functions":["T","T","P","D","D","T"],"audio":"minor/68.mp3"},{"id":"69","mode":"minor","bass":["C3","E-flat3","F3","G3","G3","A-flat3"],"soprano":["E-flat5","E-flat5","D5","C5","B-natural4","C5"],"chords":["i","i6","iio6","i64","V7","VI"],"functions":["T","T","P","D","D","T"],"audio":"minor/69.mp3"},{"id":"70","mode":"minor","bass":["C3","F3","F3","G3","G3","C3"],"soprano":["C5","C5","D5","C5","B-natural4","C5"],"chords":["i","iv","iio6","i64","V7","i"],"functions":["T","P","P","D","D","T"],"audio":"minor/70.mp3"},{"id":"71","mode":"minor","bass":["C4","A-flat3","F3","G3","G3","C3"],"soprano":["E-flat5","E-flat5","F5","E-flat5","D5","E-flat5"],"chords":["i","VI","iv","i64","V","i"],"functions":["T","T","P","D","D","T"],"audio":"minor/71.mp3"},{"id":"72","mode":"minor","bass":["C4","A-flat3","F3","G3","G3","C3"],"soprano":["E-flat5","E-flat5","F5","E-flat5","D5","E-flat5"],"chords":["i","VI","iio6","i64","V","i"],"functions":["T","T","P","D","D","T"],"audio":"minor/72.mp3"},{"id":"73","mode":"minor","bass":["C4","A-flat3","F3","G3","G3","A-flat3"],"soprano":["E-flat5","E-flat5","F5","E-flat5","D5","C5"],"chords":["i","VI","iv","i64","V7","VI"],"functions":["T","T","P","D","D","T"],"audio":"minor/73.mp3"},{"id":"74","mode":"minor","bass":["C4","A-flat3","F3","G3","G3","A-flat3"],"soprano":["E-flat5","E-flat5","F5","E-flat5","D5","C5"],"chords":["i","VI","iio6","i64","V7","VI"],"functions":["T","T","P","D","D","T"],"audio":"minor/74.mp3"}];
+
+const MAJOR_KEYS=[
+["C",0],["D-flat",1],["D",2],["E-flat",3],["E",4],
+["F",5],["F-sharp",6],["G-flat",6],["G",7],["A",9],
+["B-flat",10],["B",11],
+];
+
+const MINOR_KEYS=[
+["C",0],["D",2],["E-flat",3],["D-sharp",3],["E",4],
+["F",5],["F-sharp",6],["G",7],["G-sharp",8],["A",9],
+["B-flat",10],["B",11]
+];
+
+/* Explicit key-signature definitions. */
+const KEY_INFO={
+"C major":{letters:["C","D","E","F","G","A","B"],acc:[0,0,0,0,0,0,0],sig:"0"},
+"G major":{letters:["G","A","B","C","D","E","F"],acc:[0,0,0,0,0,0,1],sig:"1s"},
+"D major":{letters:["D","E","F","G","A","B","C"],acc:[0,0,1,0,0,0,1],sig:"2s"},
+"A major":{letters:["A","B","C","D","E","F","G"],acc:[0,0,1,0,0,1,1],sig:"3s"},
+"E major":{letters:["E","F","G","A","B","C","D"],acc:[0,1,1,0,0,1,1],sig:"4s"},
+"B major":{letters:["B","C","D","E","F","G","A"],acc:[0,1,1,0,1,1,1],sig:"5s"},
+"F-sharp major":{letters:["F","G","A","B","C","D","E"],acc:[1,1,1,0,1,1,1],sig:"6s"},
+"C-sharp major":{letters:["C","D","E","F","G","A","B"],acc:[1,1,1,1,1,1,1],sig:"7s"},
+"F major":{letters:["F","G","A","B","C","D","E"],acc:[0,0,0,-1,0,0,0],sig:"1f"},
+"B-flat major":{letters:["B","C","D","E","F","G","A"],acc:[-1,0,0,-1,0,0,0],sig:"2f"},
+"E-flat major":{letters:["E","F","G","A","B","C","D"],acc:[0,-1,0,-1,0,-1,0],sig:"3f"},
+"A-flat major":{letters:["A","B","C","D","E","F","G"],acc:[-1,-1,0,-1,-1,0,0],sig:"4f"},
+"D-flat major":{letters:["D","E","F","G","A","B","C"],acc:[-1,-1,0,-1,-1,-1,0],sig:"5f"},
+"G-flat major":{letters:["G","A","B","C","D","E","F"],acc:[-1,-1,-1,0,-1,-1,0],sig:"6f"},
+"C-flat major":{letters:["C","D","E","F","G","A","B"],acc:[-1,-1,-1,-1,-1,-1,-1],sig:"7f"}
+};
+
+const REL_MINOR={
+"C":"E-flat major","C-sharp":"E major","D":"F major",
+"E-flat":"G-flat major","D-sharp":"F-sharp major","E":"G major",
+"F":"A-flat major","F-sharp":"A major","G":"B-flat major",
+"G-sharp":"B major","A-flat":"C-flat major","A":"C major",
+"B-flat":"D-flat major","A-sharp":"C-sharp major","B":"D major"
+};
+
+const NAT={C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+
+let vrvToolkit=null;
+let current=null;
+
+function mod(n,m){return((n%m)+m)%m}
+function random(a){return a[Math.floor(Math.random()*a.length)]}
+function shiftFor(pc){return pc===0?0:(pc<=6?pc:pc-12)}
+
+function parseText(t){ return t; }
+
+function parsePitch(x){
+ x=String(x).trim();
+ let m=x.match(/^([A-Ga-g])-(sharp|flat|natural)(-?\d+)$/i);
+ if(m)return {
+   letter:m[1].toUpperCase(),
+   acc:m[2].toLowerCase()==="sharp"?"#":
+       m[2].toLowerCase()==="flat"?"b":"",
+   oct:+m[3]
+ };
+ m=x.match(/^([A-Ga-g])([#b♯♭]?)(-?\d+)$/);
+ if(!m)return null;
+ return {letter:m[1].toUpperCase(),acc:m[2],oct:+m[3]};
+}
+
+function pcOf(p){
+ let n=NAT[p.letter];
+ if(p.acc==="#"||p.acc==="♯")n++;
+ if(p.acc==="b"||p.acc==="♭")n--;
+ return mod(n,12);
+}
+
+function absPitch(p){return(p.oct+1)*12+pcOf(p)}
+
+function selectedProfile(){
+ return current.mode==="major"
+   ? KEY_INFO[current.key[0]+" major"]
+   : KEY_INFO[REL_MINOR[current.key[0]]];
+}
+
+/* Preserve the selected key's enharmonic spelling when transposing. */
+function transposeSpelled(x){
+ const p=parsePitch(x);
+ if(!p)return x;
+
+ /*
+  * Transpose pitch class and diatonic spelling independently.  The selected
+  * tonic determines the target letter for each source letter; the remaining
+  * semitone difference becomes the accidental.  This is important in minor:
+  * e.g. B-natural in C minor must become D-sharp in E minor, rather than the
+  * key-signature D-natural.
+  */
+ const shift=shiftFor(current.key[1]);
+ const targetAbs=absPitch(p)+shift;
+ const tonicLetter=current.key[0].charAt(0).toUpperCase();
+ const letters=["C","D","E","F","G","A","B"];
+ const sourceIndex=letters.indexOf(p.letter);
+ const tonicIndex=letters.indexOf(tonicLetter);
+ const targetIndex=mod(sourceIndex+tonicIndex,7);
+ const targetLetter=letters[targetIndex];
+
+ let targetOct=Math.floor(targetAbs/12)-1;
+ let naturalAbs=(targetOct+1)*12+NAT[targetLetter];
+ while(naturalAbs-targetAbs>6){ targetOct--; naturalAbs-=12; }
+ while(targetAbs-naturalAbs>6){ targetOct++; naturalAbs+=12; }
+ const acc=targetAbs-naturalAbs;
+
+ const a=acc===1?"#":
+         acc===-1?"b":
+         acc===2?"##":
+         acc===-2?"bb":
+         acc===3?"###":
+         acc===-3?"bbb":"";
+ return targetLetter+a+targetOct;
+}
+
+function meiNote(x,dur){
+ const p=parsePitch(transposeSpelled(x));
+ if(!p)return "";
+
+ const prof=selectedProfile();
+ const keyAcc={C:"",D:"",E:"",F:"",G:"",A:"",B:""};
+ const sharpOrder=["F","C","G","D","A","E","B"];
+ const flatOrder=["B","E","A","D","G","C","F"];
+ const sigMatch=(prof.sig||"0").match(/^(\d+)([sf])?$/);
+ const count=sigMatch ? Number(sigMatch[1]) : 0;
+ const sigType=sigMatch && sigMatch[2] ? sigMatch[2] : "";
+ if(sigType==="s")sharpOrder.slice(0,count).forEach(l=>keyAcc[l]="#");
+ if(sigType==="f")flatOrder.slice(0,count).forEach(l=>keyAcc[l]="b");
+
+ // Compare the note's intended accidental with the accidental supplied by
+ // the key signature.  A natural must be explicit when the key signature
+ // makes that letter sharp/flat (e.g. E-natural in F minor).
+ const desired=(p.acc||"")==="♯" ? "#" : (p.acc||"")==="♭" ? "b" : (p.acc||"");
+ const def=keyAcc[p.letter];
+ const acc=desired===def ? "" :
+           desired==="#" ? ' accid="s"' :
+           desired==="b" ? ' accid="f"' :
+           desired==="##" ? ' accid="ss"' :
+           desired==="bb" ? ' accid="ff"' :
+           desired==="" && def ? ' accid="n"' : "";
+
+ return `<note pname="${p.letter.toLowerCase()}" oct="${p.oct}"${acc} dur="${dur}"/>`;
+}
+
+function buildMEI(p,startOnly){
+ const sig=selectedProfile().sig;
+
+ if(startOnly){
+   /* Starting pitches: one half note in each staff. */
+   return `<?xml version="1.0" encoding="UTF-8"?>
+<mei xmlns="http://www.music-encoding.org/ns/mei" meiversion="5.0">
+<music><body><mdiv><score>
+<scoreDef meter.count="2" meter.unit="4">
+<keySig sig="${sig}"/>
+<staffGrp>
+<staffDef n="1" lines="5" clef.shape="G" clef.line="2"/>
+<staffDef n="2" lines="5" clef.shape="F" clef.line="4"/>
+</staffGrp>
+</scoreDef>
+<section><measure n="1">
+<staff n="1"><layer n="1">${meiNote(p.soprano[0],"2")}</layer></staff>
+<staff n="2"><layer n="1">${meiNote(p.bass[0],"2")}</layer></staff>
+</measure></section>
+</score></mdiv></body></music></mei>`;
+ }
+
+ return `<?xml version="1.0" encoding="UTF-8"?>
+<mei xmlns="http://www.music-encoding.org/ns/mei" meiversion="5.0">
+<music><body><mdiv><score>
+<scoreDef meter.count="4" meter.unit="4">
+<keySig sig="${sig}"/>
+<staffGrp>
+<staffDef n="1" lines="5" clef.shape="G" clef.line="2"/>
+<staffDef n="2" lines="5" clef.shape="F" clef.line="4"/>
+</staffGrp>
+</scoreDef>
+<section>
+<measure n="1">
+<staff n="1"><layer n="1">${meiNote(p.soprano[0],"2")}${meiNote(p.soprano[1],"2")}</layer></staff>
+<staff n="2"><layer n="1">${meiNote(p.bass[0],"2")}${meiNote(p.bass[1],"2")}</layer></staff>
+</measure>
+<measure n="2">
+<staff n="1"><layer n="1">${meiNote(p.soprano[2],"2")}${meiNote(p.soprano[3],"2")}</layer></staff>
+<staff n="2"><layer n="1">${meiNote(p.bass[2],"2")}${meiNote(p.bass[3],"2")}</layer></staff>
+</measure>
+<measure n="3">
+<staff n="1"><layer n="1">${meiNote(p.soprano[4],"2")}${meiNote(p.soprano[5],"2")}</layer></staff>
+<staff n="2"><layer n="1">${meiNote(p.bass[4],"2")}${meiNote(p.bass[5],"2")}</layer></staff>
+</measure>
+</section>
+</score></mdiv></body></music></mei>`;
+}
+
+/* Same known-working Verovio initialization pattern as the prior app. */
+document.addEventListener("DOMContentLoaded",()=>{
+ if(!window.verovio||!verovio.module){
+   document.getElementById("status").textContent="Verovio did not load. Check your internet connection and refresh.";
+   return;
+ }
+
+ verovio.module.onRuntimeInitialized=()=>{
+   vrvToolkit=new verovio.toolkit();
+   vrvToolkit.setOptions({
+     scale:40,
+     pageHeight:500,
+     adjustPageWidth:true,
+     pageMarginTop:0,
+     pageMarginBottom:0,
+     pageMarginLeft:40,
+     pageMarginRight:40
+   });
+   document.getElementById("status").textContent="";
+   generate();
+ };
+});
+
+function renderStarting(){
+ const p=parseText(current);
+ document.getElementById("notationFrame").innerHTML=
+   vrvToolkit.renderData(buildMEI(p,true),{})||"";
+}
+
+function reveal(){
+ if(!current||!vrvToolkit)return;
+
+ const p=parseText(current);
+
+ document.getElementById("notationFrame").innerHTML=
+   vrvToolkit.renderData(buildMEI(p,false),{})||"";
+
+ document.getElementById("harmony").innerHTML=
+   p.chords.map((x,i)=>`<div class="harmony-cell"><div>${x}</div><div class="harmony-function">${p.functions[i]||""}</div></div>`).join("");
+
+ document.getElementById("solutionKey").textContent=current.key[0];
+ document.getElementById("solutionMode").textContent=current.mode==="major"?"Major":"Minor";
+ document.getElementById("solution").hidden=false;
+}
+
+function generate(){
+ if(!vrvToolkit)return;
+
+ const mode=Math.random()<.5?"major":"minor";
+ const ex=random(EXERCISES.filter(x=>x.mode===mode));
+ const key=random(mode==="major"?MAJOR_KEYS:MINOR_KEYS);
+
+ current={...ex,key};
+
+ document.getElementById("key").textContent=key[0];
+ document.getElementById("mode").textContent=
+   mode==="major"?"Major":"Minor";
+
+ document.getElementById("solution").hidden=true;
+ document.getElementById("notationFrame").innerHTML="";
+ document.getElementById("harmony").innerHTML="";
+ document.getElementById("solutionKey").textContent="";
+ document.getElementById("solutionMode").textContent="";
+
+ renderStarting();
+}
+
+async function listen(){
+ if(!current)return;
+ // Audio and notation are transposed independently, but both follow the
+ // same selected key. Audio files were pre-rendered with Rubber Band so
+ // pitch changes do not alter tempo and the browser does no pitch shifting.
+ const shift=shiftFor(current.key[1]);
+ const tag=shift<0 ? "m"+(-shift) : shift===0 ? "0" : "p"+shift;
+ const audioPath=`audio/${current.mode}/${current.id}_${tag}.mp3`;
+ if(current.audioEl){ current.audioEl.pause(); current.audioEl.currentTime=0; }
+ const src=new Audio(audioPath);
+ current.audioEl=src;
+ try{ await src.play(); }catch(e){
+   document.getElementById("status").textContent="Audio could not be played. Try clicking Listen again.";
+ }
+}
+</script>
+</body>
+</html>
